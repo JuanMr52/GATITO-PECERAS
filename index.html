@@ -35,6 +35,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 .al{border-radius:14px;padding:8px 12px;margin:6px 0;font-size:14px;background:color-mix(in srgb,var(--warn) 20%,var(--card))}.al.bad{background:color-mix(in srgb,var(--bad) 22%,var(--card))}
 .cats{display:flex;gap:8px;flex-wrap:wrap}.cats button{border:3px solid transparent;background:none;border-radius:16px;padding:0;cursor:pointer}.cats button.on{border-color:var(--ac)}
 .done{text-decoration:line-through;color:var(--mut)}
+.ev{display:grid;grid-template-columns:24px 1fr auto 32px;gap:6px;align-items:center;padding:6px 0;border-top:1px solid var(--line);font-size:14px}
+.sum{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--mut);margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}.sum b{color:var(--ink)}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:16px;opacity:0;transition:.3s;pointer-events:none;max-width:90%;text-align:center}#toast.s{opacity:1}
 @media(prefers-reduced-motion:reduce){.fish,.eat{animation:none}.fish{left:40%}}
 </style></head><body><main id="app"></main><div id="toast"></div>
@@ -44,9 +46,10 @@ const K='pecera_v1',$=s=>document.querySelector(s),esc=s=>String(s).replace(/[&<
 const iso=d=>new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
 let S=null;try{S=JSON.parse(localStorage.getItem(K))}catch(e){}
 S=S||{p:{t:'semestre',s:iso(new Date())},cat:{c:'#e8a45c',n:'Miso'},subs:[],tasks:[]};
-let tab='home',eating=false;
+let tab='home',eating=false,cur=null,addOpen=null;
 const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
 const toast=m=>{const t=$('#toast');t.textContent=m;t.className='s';clearTimeout(toast.h);toast.h=setTimeout(()=>t.className='',2600)};
+const fmtD=f=>String(f).split('-').reverse().join('/');
 const COL=[['Naranja','#e8a45c'],['Gris','#9aa3ad'],['Negro','#3b3a42'],['Crema','#f1dfba']];
 function cat(c,m,w){const ey=m=='happy'?'<path d="M35 48Q40 42 45 48M55 48Q60 42 65 48" stroke="#2b2530" stroke-width="3" fill="none" stroke-linecap="round"/>':'<circle cx="40" cy="47" r="3.6" fill="#2b2530"/><circle cx="60" cy="47" r="3.6" fill="#2b2530"/>';
 const br=m=='warn'||m=='bad'?'<path d="M34 39L45 42M66 39L55 42" stroke="#2b2530" stroke-width="2.5" stroke-linecap="round"/>':'';
@@ -55,7 +58,11 @@ const mo=m=='happy'?'M43 62Q50 69 57 62':m=='ok'?'M45 63Q50 66 55 63':'M44 67Q50
 return `<svg class="${eating?'eat':''}" width="${w}" viewBox="0 0 100 100" aria-label="Gatito"><path d="M72 84Q96 80 90 56" stroke="${c}" stroke-width="9" fill="none" stroke-linecap="round"/><ellipse cx="50" cy="78" rx="27" ry="19" fill="${c}"/><path d="M25 42L29 12L49 28ZM75 42L71 12L51 28Z" fill="${c}"/><circle cx="50" cy="50" r="27" fill="${c}"/><path d="M31 22L33 30L40 26Z M69 22L67 30L60 26Z" fill="#e58a9a" opacity=".6"/>${ey}${br}${tear}<path d="M47 55L53 55L50 59Z" fill="#e58a9a"/><path d="${mo}" stroke="#2b2530" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>`}
 function fish(m){const c=m=='sad'?'#8ea9bd':m=='warn'?'#f0b36a':'#f28c5c';
 return `<svg class="fish" viewBox="0 0 60 40"><path d="M46 20L60 6V34Z" fill="${c}"/><ellipse cx="26" cy="20" rx="24" ry="14" fill="${c}"/><circle cx="14" cy="17" r="3.5" fill="#fff"/><circle cx="13" cy="17.5" r="1.7" fill="#2b2530"/><path d="${m=='happy'?'M8 25Q12 29 16 25':'M8 27Q12 23 16 27'}" stroke="#2b2530" stroke-width="1.6" fill="none"/>${m!='happy'?'<path d="M9 11L17 13" stroke="#2b2530" stroke-width="1.6"/>':''}</svg>`}
-function calc(s){let W=0,A=0,tot=0;s.evs.forEach(e=>{tot+=+e.w;if(e.g!==null&&e.g!==''){W+=+e.w;A+=e.g*e.w/100}});
+/* Promedio simple de las notas de una sección (null si no tiene notas) */
+const secProm=x=>{const gs=(x.items||[]).filter(e=>e.g!==null&&e.g!==''&&e.g!==undefined);return gs.length?gs.reduce((a,e)=>a+ +e.g,0)/gs.length:null};
+function calc(s){let W=0,A=0,tot=0;
+if(s.secs&&s.secs.length){s.secs.forEach(x=>{tot+=+x.w;const p=secProm(x);if(p!==null){W+=+x.w;A+=p*x.w/100}})}
+else{(s.evs||[]).forEach(e=>{tot+=+e.w;if(e.g!==null&&e.g!==''){W+=+e.w;A+=e.g*e.w/100}})}
 const rem=Math.max(0,tot-W),perf=W?A/W*100:null,need=rem>0?(s.min-A)/rem*100:null;let st='ok';
 if(W){if(rem>0?need>100:A<s.min)st='bad';else if(perf<s.min||need>85)st='warn'}
 return{W,A,tot,rem,perf,need,st}}
@@ -77,23 +84,49 @@ return `<h1>🐾 Pecera de ${esc(S.cat.n)}</h1>
 <div class="pet">${cat(S.cat.c,worst,w)}<div class="bub">${msg}<br><small>${fm=='happy'?'El pez está feliz con tus tareas.':fm=='warn'?'El pez está nervioso: hay una entrega cerca.':'El pez está triste: tienes una tarea vencida.'}</small></div></div>
 <h3 style="margin-top:16px">Avisos</h3>${al.length?al.map(x=>`<div class="al ${x[0]}">${x[1]}</div>`).join(''):'<div class="card mut">Sin avisos. Todo en orden. ✨</div>'}`}
 function subs(){return `<h1>Materias</h1><div class="card"><h3>Nueva materia</h3><div class="row"><input class="t" id="sn" placeholder="Nombre (ej. Cálculo I)"><input type="number" id="sm" value="60" min="0" max="100" title="Nota mínima para aprobar"></div><small>Nota mínima para aprobar (sobre 100)</small><div class="row"><button class="btn" onclick="addSub()">Agregar materia</button></div></div>`+
-S.subs.map((s,i)=>{const c=calc(s);return `<div class="card"><div class="row"><h3 style="flex:1;margin:0">${esc(s.name)} <small>mín ${s.min}</small></h3><button class="btn g" onclick="delSub(${i})" aria-label="Borrar materia">🗑</button></div>
-<div class="bar"><i style="width:${Math.min(100,c.A)}%"></i></div><small>Acumulas ${c.A.toFixed(1)} de 100 pts${c.rem>0&&c.W?' · necesitas '+(c.need<=0?'nada más, ¡ya aprobaste!':Math.ceil(c.need)+' de promedio en el '+c.rem+'% restante'):''}${c.tot!=100?' · ⚠️ los porcentajes suman '+c.tot+'%':''}</small>
-${s.evs.map((e,j)=>`<div class="row"><span>${esc(e.n)} <small>${e.w}%</small></span><input type="number" min="0" max="100" placeholder="nota" value="${e.g??''}" onchange="setG(${i},${j},this.value)" aria-label="Nota de ${esc(e.n)}"><button class="btn g" onclick="delEv(${i},${j})" aria-label="Quitar">✕</button></div>`).join('')}
-<div class="row"><input class="t" id="en${i}" placeholder="Evaluación (Parcial 1)"><input type="number" id="ew${i}" placeholder="%" min="1" max="100"><button class="btn" onclick="addEv(${i})">+</button></div></div>`}).join('')}
+S.subs.map((s,i)=>{const c=calc(s),legacy=!(s.secs&&s.secs.length)&&(s.evs||[]).length>0;return `<div class="card"><div class="row"><h3 style="flex:1;margin:0">${esc(s.name)} <small>mín ${s.min}</small></h3><button class="btn" onclick="openEv(${i})">📝 Evaluaciones</button><button class="btn g" onclick="delSub(${i})" aria-label="Borrar materia">🗑</button></div>
+<div class="bar"><i style="width:${Math.min(100,c.A)}%"></i></div><small>Acumulas ${c.A.toFixed(1)} de 100 pts${c.rem>0&&c.W?' · necesitas '+(c.need<=0?'nada más, ¡ya aprobaste!':Math.ceil(c.need)+' de promedio en el '+c.rem+'% restante'):''}${c.tot!=100&&c.tot>0?' · ⚠️ los porcentajes suman '+c.tot+'%':''}</small>
+${legacy?s.evs.map((e,j)=>`<div class="row"><span>${esc(e.n)} <small>${e.w}%</small></span><input type="number" min="0" max="100" placeholder="nota" value="${e.g??''}" onchange="setG(${i},${j},this.value)" aria-label="Nota de ${esc(e.n)}"><button class="btn g" onclick="delEv(${i},${j})" aria-label="Quitar">✕</button></div>`).join('')+`<div class="row"><input class="t" id="en${i}" placeholder="Evaluación (Parcial 1)"><input type="number" id="ew${i}" placeholder="%" min="1" max="100"><button class="btn" onclick="addEv(${i})">+</button></div>`:''}</div>`}).join('')}
+/* Pantalla de Evaluaciones de una materia: secciones + notas */
+function evs(){const s=S.subs[cur];if(!s){tab='subs';return subs()}
+s.secs=s.secs||[];const tot=s.secs.reduce((a,x)=>a+ +x.w,0),ok=tot==100,c=calc(s);
+const head=`<button class="btn g" onclick="tab='subs';addOpen=null;render();scrollTo(0,0)">← Materias</button><h1>📝 ${esc(s.name)}</h1>
+<div class="card"><h3>Agregar sección</h3><div class="row"><input class="t" id="xn" placeholder="Sección (Quiz, Laboratorio…)"><input type="number" id="xw" placeholder="%" min="1" max="100"></div><div class="row"><button class="btn" onclick="addSec()">Agregar sección</button></div>
+<div class="bar"><i style="width:${Math.min(100,tot)}%;${ok?'':'background:var(--warn)'}"></i></div><small>Las secciones suman ${tot}% de 100%${ok?' ✅':tot<100?' · faltan '+(100-tot)+'% para poder agregar evaluaciones':''}</small></div>`;
+const body=s.secs.map((x,k)=>{x.items=x.items||[];const p=secProm(x),ct=p===null?0:p*x.w/100;
+const form=addOpen==k?`<div class="row"><input class="t" id="in" placeholder="Ej. Quiz 1"><input type="number" id="ig" placeholder="Nota" min="0" max="100" step="any"></div><div class="row"><input type="date" id="id" aria-label="Fecha (opcional)"><button class="btn" onclick="addItem(${k})">OK</button><button class="btn g" onclick="addOpen=null;render()">Cancelar</button></div>`:ok?`<div class="row"><button class="btn" onclick="openAdd(${k})" aria-label="Agregar evaluación">＋ Agregar evaluación</button></div>`:'';
+return `<div class="card"><div class="row"><h3 style="flex:1;margin:0">${esc(x.n)} <small>${x.w}%</small></h3><button class="btn g" onclick="delSec(${k})" aria-label="Borrar sección">🗑</button></div>
+${x.items.map((e,m)=>`<div class="ev"><small>${m+1}</small><span>${esc(e.n)}${e.f?'<br><small>'+fmtD(e.f)+'</small>':''}</span><b>${(+e.g).toFixed(2)}</b><button class="btn g" onclick="delItem(${k},${m})" aria-label="Quitar">✕</button></div>`).join('')}
+${form}<div class="sum"><span>Promedio: <b>${p===null?'—':p.toFixed(2)}</b></span><span>Porcentaje: <b>${ct.toFixed(2)}%</b> de ${x.w}%</span></div></div>`}).join('');
+const fin=s.secs.length?`<div class="card"><h3>Nota final: ${Math.round(c.A)} <small>(${c.A.toFixed(2)})</small></h3><div class="bar"><i style="width:${Math.min(100,c.A)}%"></i></div><small>Mínimo para aprobar: ${s.min}${c.rem>0&&c.W?' · necesitas '+(c.need<=0?'nada más, ¡ya aprobaste!':Math.ceil(c.need)+' de promedio en el '+c.rem+'% restante'):''}</small></div>`:'<div class="card mut">Agrega tus secciones (por ejemplo Quiz 10%, Laboratorio 20%…) hasta sumar 100%.</div>';
+return head+body+fin}
 function agenda(){const l=S.tasks.map((t,i)=>[t,i]).sort((a,b)=>a[0].done-b[0].done||new Date(a[0].due)-new Date(b[0].due));
 return `<h1>Agenda</h1><div class="card"><h3>Nueva tarea</h3><div class="row"><input class="t" id="tt" placeholder="Ej. Taller de física"><select id="ts"><option value="">Sin materia</option>${S.subs.map(s=>`<option>${esc(s.name)}</option>`).join('')}</select></div><div class="row"><input type="datetime-local" id="td"><button class="btn" onclick="addTask()">Agregar</button></div></div>`+
 (l.length?l.map(([t,i])=>{const s=tState(t);return `<div class="card row"><input type="checkbox" ${t.done?'checked':''} onchange="togTask(${i})" aria-label="Entregada"><span class="${t.done?'done':''}">${esc(t.t)}<br><small>${t.s?esc(t.s)+' · ':''}${new Date(t.due).toLocaleString('es',{dateStyle:'medium',timeStyle:'short'})}${s=='late'?' · 🔴 vencida':s=='soon'?' · 🟠 pronto':''}</small></span><button class="btn g" onclick="delTask(${i})" aria-label="Borrar">🗑</button></div>`}).join(''):'<div class="card mut">Aún no tienes tareas. Agrega la primera y el pez te avisará.</div>')}
 function sets(){return `<h1>Ajustes</h1><div class="card"><h3>Tu gatito</h3><div class="cats">${COL.map(([n,c])=>`<button class="${S.cat.c==c?'on':''}" onclick="setCat('${c}')" aria-label="${n}">${cat(c,'happy',64)}</button>`).join('')}</div><div class="row"><input class="t" value="${esc(S.cat.n)}" onchange="S.cat.n=this.value||'Miso';save();render()" aria-label="Nombre de la mascota"></div></div>
 <div class="card"><h3>Periodo</h3><div class="row"><select onchange="S.p.t=this.value;save();render()"><option ${S.p.t=='semestre'?'selected':''}>semestre</option><option ${S.p.t=='cuatrimestre'?'selected':''}>cuatrimestre</option></select><input type="date" value="${S.p.s}" onchange="S.p.s=this.value||S.p.s;save();render()" aria-label="Fecha de inicio"></div><small>Las mascotas nacen el día de inicio y crecen hasta el final del periodo (6 meses el semestre, 4 el cuatrimestre).</small></div>
 <div class="card"><button class="btn" style="background:var(--bad)" onclick="if(confirm('¿Borrar todos tus datos?')){S=null;try{localStorage.removeItem(K)}catch(e){}location.reload()}">Borrar todo</button></div>`}
-const V={home,subs,agenda,sets},T=[['home','🐠 Pecera'],['subs','📚 Materias'],['agenda','📅 Agenda'],['sets','🐱 Ajustes']];
-function render(){$('#app').innerHTML=V[tab]();$('#nav').innerHTML=T.map(([k,n])=>`<button class="${tab==k?'on':''}" onclick="tab='${k}';render();scrollTo(0,0)">${n}</button>`).join('')}
-function addSub(){const n=$('#sn').value.trim();if(!n)return toast('Escribe el nombre de la materia');S.subs.push({name:n,min:+$('#sm').value||60,evs:[]});save();render()}
+const V={home,subs,agenda,sets,evs},T=[['home','🐠 Pecera'],['subs','📚 Materias'],['agenda','📅 Agenda'],['sets','🐱 Ajustes']];
+function render(){$('#app').innerHTML=V[tab]();$('#nav').innerHTML=T.map(([k,n])=>`<button class="${tab==k||(tab=='evs'&&k=='subs')?'on':''}" onclick="tab='${k}';addOpen=null;render();scrollTo(0,0)">${n}</button>`).join('')}
+function addSub(){const n=$('#sn').value.trim();if(!n)return toast('Escribe el nombre de la materia');S.subs.push({name:n,min:+$('#sm').value||60,evs:[],secs:[]});save();render()}
 function delSub(i){if(confirm('¿Borrar esta materia?')){S.subs.splice(i,1);save();render()}}
 function addEv(i){const n=$('#en'+i).value.trim(),w=+$('#ew'+i).value;if(!n||!w)return toast('Pon el nombre y el porcentaje');S.subs[i].evs.push({n,w,g:null});save();render()}
 function delEv(i,j){S.subs[i].evs.splice(j,1);save();render()}
 function setG(i,j,v){S.subs[i].evs[j].g=v===''?null:Math.min(100,Math.max(0,+v));save();if(v!==''){eating=true;toast(`😻 ¡${S.cat.n} se comió tu nota!`)}render();eating=false}
+/* Evaluaciones por secciones */
+function openEv(i){cur=i;addOpen=null;tab='evs';render();scrollTo(0,0)}
+function addSec(){const s=S.subs[cur],n=$('#xn').value.trim(),w=+$('#xw').value;
+if(!n||!w||w<1)return toast('Pon el nombre y el porcentaje');
+const tot=s.secs.reduce((a,x)=>a+ +x.w,0);
+if(tot+w>100)return toast(`Solo puedes agregar hasta ${100-tot}% más (el total no puede pasar de 100%)`);
+s.secs.push({n,w,items:[]});save();render()}
+function delSec(k){if(confirm('¿Borrar esta sección y sus evaluaciones?')){S.subs[cur].secs.splice(k,1);addOpen=null;save();render()}}
+function openAdd(k){addOpen=k;render();const e=$('#in');if(e)e.focus()}
+function addItem(k){const s=S.subs[cur],x=s.secs[k],v=$('#ig').value;
+if(v==='')return toast('Escribe la nota que sacaste');
+const g=Math.min(100,Math.max(0,+v)),n=$('#in').value.trim()||`Evaluación ${x.items.length+1}`,f=$('#id').value;
+x.items.push({n,f,g});addOpen=null;save();eating=true;toast(`😻 ¡${S.cat.n} se comió tu nota!`);render();eating=false}
+function delItem(k,m){S.subs[cur].secs[k].items.splice(m,1);save();render()}
 function addTask(){const t=$('#tt').value.trim(),d=$('#td').value;if(!t||!d)return toast('Pon el nombre y la fecha');S.tasks.push({t,s:$('#ts').value,due:d,done:false});save();render()}
 function togTask(i){const t=S.tasks[i];t.done=!t.done;if(t.done)toast(new Date(t.due)>=Date.now()?'🐟 ¡El pez está feliz, entregaste a tiempo!':'🐟 Entregada. ¡A la próxima a tiempo!');save();render()}
 function delTask(i){S.tasks.splice(i,1);save();render()}
